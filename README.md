@@ -4,7 +4,7 @@
 Le circuit traverse les 8 vraies planètes du système solaire, puis les planètes ajoutées par
 chaque personne qui contribue au projet. Chaque nouvelle planète = un nouveau portail.
 
-👉 **Jouer : https://hdeligondes8.github.io/la-galaxie/**
+👉 **Jouer : https://la-galaxie.vercel.app**
 
 Le projet est **open source** : tout le monde peut voir le code, le copier et l'améliorer.
 
