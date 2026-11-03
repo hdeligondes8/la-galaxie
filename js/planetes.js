@@ -2,6 +2,7 @@
 //  🪐  LES PLANÈTES DE LA GALAXIE
 // ---------------------------------------------------------------------
 //  C'est LE fichier à modifier pour ajouter ta planète.
+//  Chaque planète ajoute aussi un portail au circuit de la course !
 //  1. Copie le bloc "MODÈLE" tout en bas (entre les accolades { ... })
 //  2. Colle-le à la fin de la liste, juste avant le ];
 //  3. Change les valeurs (nom, auteur, couleurs...)

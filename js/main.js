@@ -10,6 +10,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { planetes as planetesBrutes, depot } from './planetes.js';
+import * as son from './son.js';
+import { creerCourse } from './course.js';
 
 // ---------- Réglages ----------
 const planetes = planetesBrutes.filter((p) => p && p.nom);
@@ -233,6 +235,9 @@ controls.enabled = false;
 // ---------- Lumières ----------
 scene.add(new THREE.AmbientLight(0x6070a0, 0.3));
 scene.add(new THREE.PointLight(0xfff0dd, 3.4, 0, 0));
+// Petite lumière accrochée à la caméra pour bien voir le vaisseau pendant la course
+const lumiereCamera = new THREE.PointLight(0xcfe0ff, 0, 40, 0);
+camera.add(lumiereCamera);
 
 // ---------- Fond : étoiles, galaxie spirale, nébuleuses ----------
 const disque = textureHalo(64);
@@ -483,6 +488,7 @@ function ajouterPlanete(p, index) {
     angle: index * 2.399 + rnd() * 0.5, vitesse: 1.1 / Math.pow(R, 0.85), spin: 0.15 + rnd() * 0.25,
     etiquette: etiq.element,
   };
+  c.angleDepart = c.angle;
   zoneClic(holder, Math.max(rayon * 1.8, 4.5), c);
   corps.push(c);
 }
@@ -504,6 +510,7 @@ function ajouterOrbiteLibre(index) {
     type: 'libre', index, holder, mesh, lunes: [], rayon: 1.1, R,
     angle: index * 2.399, vitesse: 1.1 / Math.pow(R, 0.85), spin: 0.3, etiquette: etiq.element,
   };
+  c.angleDepart = c.angle;
   zoneClic(holder, 4.5, c);
   corps.push(c);
 }
@@ -570,91 +577,20 @@ function creerHyperespace() {
 }
 const hyperespace = creerHyperespace();
 
-// ---------- Son (généré en direct, aucun fichier) ----------
-let audio = null;
-let sonActif = lire('son') !== 'non';
-
-function demarrerSon() {
-  if (audio) return;
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return;
-  const ctx = new Ctx();
-  const maitre = ctx.createGain();
-  maitre.gain.value = 0;
-  maitre.connect(ctx.destination);
-
-  const filtre = ctx.createBiquadFilter();
-  filtre.type = 'lowpass';
-  filtre.frequency.value = 520;
-  filtre.Q.value = 3;
-  const nappe = ctx.createGain();
-  nappe.gain.value = 0;
-  filtre.connect(nappe);
-  nappe.connect(maitre);
-  [55, 82.41, 110, 164.81, 246.94].forEach((f, i) => {
-    const o = ctx.createOscillator();
-    o.type = i % 2 ? 'sawtooth' : 'triangle';
-    o.frequency.value = f;
-    o.detune.value = (i - 2) * 7;
-    const g = ctx.createGain();
-    g.gain.value = 0.17;
-    o.connect(g); g.connect(filtre); o.start();
-  });
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.045;
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 320;
-  lfo.connect(lfoGain); lfoGain.connect(filtre.frequency); lfo.start();
-  nappe.gain.linearRampToValueAtTime(1, ctx.currentTime + 5);
-  maitre.gain.value = 0.13;
-  audio = { ctx, maitre };
-}
-
-function bruitage(type) {
-  if (!audio || !sonActif) return;
-  const { ctx, maitre } = audio;
-  const t = ctx.currentTime;
-  if (type === 'hyperespace') {
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
-    const d = buffer.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.Q.value = 1.2;
-    bp.frequency.setValueAtTime(180, t);
-    bp.frequency.exponentialRampToValueAtTime(2400, t + 1.8);
-    bp.frequency.exponentialRampToValueAtTime(120, t + 4);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(2.2, t + 1.2);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 4);
-    src.connect(bp); bp.connect(g); g.connect(maitre);
-    src.start(t); src.stop(t + 4);
-  } else {
-    [880, 1320].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      o.type = 'sine'; o.frequency.value = f;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(i ? 0.25 : 0.5, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-      o.connect(g); g.connect(maitre); o.start(t); o.stop(t + 1.5);
-    });
-  }
-}
-
-function appliquerSon() {
-  btnSon.textContent = sonActif ? '🔊' : '🔇';
-  if (!audio) return;
-  if (sonActif) audio.ctx.resume(); else audio.ctx.suspend();
-}
+// ---------- La course ----------
+const signature = graine(planetes.map((p) => `${p.nom}:${p.taille}:${p.type}`).join('|') + NB_ORBITES).toString(36);
+const course = creerCourse({
+  scene, camera, corps, hyperespace, halo, haute, signature,
+  quandQuitter: () => lancerExploration(),
+});
 
 // ---------- Interface ----------
 const $ = (id) => document.getElementById(id);
 const intro = $('intro'), hud = $('hud'), aide = $('aide');
 const fiche = $('fiche'), ficheContenu = $('fiche-contenu'), annuaire = $('annuaire');
-const btnSon = $('btn-son'), btnQualite = $('btn-qualite'), btnEntrer = $('btn-entrer');
+const btnSon = $('btn-son'), btnQualite = $('btn-qualite'), btnMode = $('btn-mode');
+const btnCourse = $('btn-course'), btnExplorer = $('btn-explorer');
+const appliquerSon = () => { btnSon.textContent = son.sonActif() ? '🔊' : '🔇'; };
 const nbLibres = NB_ORBITES - planetes.length;
 const nbAuteurs = new Set(planetes.map((p) => (p.auteur || '').trim().toLowerCase()).filter(Boolean)).size;
 const lienDepot = /^https?:\/\//.test(depot) ? depot : '#';
@@ -756,7 +692,7 @@ function selectionner(c) {
   controls.minDistance = c.rayon * 1.6;
   ficheContenu.innerHTML = contenuFiche(c);
   fiche.classList.remove('cache');
-  bruitage('ping');
+  son.bruitage('ping');
 }
 
 function fermer() {
@@ -836,19 +772,55 @@ canvas.addEventListener('pointermove', (e) => {
   canvas.style.cursor = c ? 'pointer' : '';
 });
 
-// ---------- Boutons ----------
-function entrer() {
+// ---------- Passer de la course à l'exploration ----------
+let modeChoisi = 'course';
+
+function entrer(mode) {
   if (etat !== 'accueil') return;
+  modeChoisi = mode;
   etat = 'intro';
   debutIntro = horloge.elapsedTime;
   departIntro.copy(camera.position);
   intro.classList.add('cache');
   setTimeout(() => { intro.style.display = 'none'; }, 1300);
-  if (sonActif) { demarrerSon(); bruitage('hyperespace'); }
+  son.demarrerSon();
+  son.bruitage('hyperespace');
   hyperespace.lignes.visible = true;
 }
 
-btnEntrer.addEventListener('click', entrer);
+function lancerCourse() {
+  fiche.classList.add('cache');
+  annuaire.classList.add('cache');
+  suivi?.etiquette?.classList.remove('cache');
+  suivi = null;
+  enVol = retour = false;
+  decalage.x = decalage.y = 0;
+  controls.enabled = false;
+  etat = 'course';
+  document.body.classList.add('en-course');
+  btnMode.textContent = '🔭 Explorer';
+  lumiereCamera.intensity = 0.8;
+  course.demarrer();
+}
+
+function lancerExploration() {
+  course.arreter();
+  etat = 'libre';
+  document.body.classList.remove('en-course');
+  btnMode.textContent = '🏁 Course';
+  lumiereCamera.intensity = 0;
+  controls.minDistance = 10;
+  retour = true;
+  debutVol = horloge.elapsedTime;
+}
+
+btnCourse.addEventListener('click', () => entrer('course'));
+btnExplorer.addEventListener('click', () => entrer('explorer'));
+btnMode.addEventListener('click', () => {
+  btnMode.blur();
+  if (etat === 'course') lancerExploration();
+  else if (etat === 'libre') lancerCourse();
+});
 $('fiche-fermer').addEventListener('click', fermer);
 $('btn-annuaire').addEventListener('click', () => annuaire.classList.toggle('cache'));
 $('btn-ajouter').addEventListener('click', () => {
@@ -856,9 +828,8 @@ $('btn-ajouter').addEventListener('click', () => {
   selectionner(corps.find((c) => c.type === 'libre') || corpsSoleil);
 });
 btnSon.addEventListener('click', () => {
-  sonActif = !sonActif;
-  ecrire('son', sonActif ? 'oui' : 'non');
-  if (sonActif) demarrerSon();
+  btnSon.blur();
+  son.basculerSon();
   appliquerSon();
 });
 btnQualite.addEventListener('click', () => {
@@ -866,8 +837,8 @@ btnQualite.addEventListener('click', () => {
   location.reload();
 });
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { annuaire.classList.add('cache'); fermer(); }
-  if (e.key === 'Enter' && etat === 'accueil') entrer();
+  if (e.key === 'Escape' && etat === 'libre') { annuaire.classList.add('cache'); fermer(); }
+  if (e.key === 'Enter' && etat === 'accueil') entrer('course');
 });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -925,7 +896,10 @@ function boucle() {
       hud.classList.remove('cache');
       aide.classList.remove('cache');
       rendusEtiquettes.domElement.style.opacity = '1';
+      if (modeChoisi === 'course') lancerCourse();
     }
+  } else if (etat === 'course') {
+    course.maj(dt);
   } else {
     mettreAJourCamera(dt);
     controls.update();
@@ -937,5 +911,5 @@ function boucle() {
 }
 
 boucle();
-btnEntrer.disabled = false;
-btnEntrer.textContent = 'Entrer dans la galaxie ▸';
+btnCourse.disabled = btnExplorer.disabled = false;
+btnCourse.textContent = '🏁 Lancer la course';

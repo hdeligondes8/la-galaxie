@@ -1,16 +1,41 @@
 # 🌌 La Galaxie
 
-**Une galaxie en 3D construite à plusieurs.** Au centre, un soleil. Autour, des orbites.
-Chaque planète a été ajoutée par une personne différente — et il reste des orbites libres.
+**Une course de vaisseaux en 3D, sur un circuit construit à plusieurs.**
+Chaque planète de la galaxie a été ajoutée par une personne différente, et chaque planète ajoute
+un portail au circuit. Plus il y a de monde, plus la course est longue.
 
-👉 **Voir le site : https://hdeligondes8.github.io/la-galaxie/**
+👉 **Jouer : https://hdeligondes8.github.io/la-galaxie/**
 
 Le projet est **open source** : tout le monde peut voir le code, le copier et l'améliorer.
-Le but, c'est que la galaxie grandisse avec chaque personne qui passe.
+
+---
+
+## 🏁 Le jeu
+
+Pilote ton vaisseau à travers les **portails** placés à côté de chaque planète, dans l'ordre,
+puis repasse la ligne de départ dorée. Fais les tours le plus vite possible.
+
+| | Ordinateur | Téléphone |
+|---|---|---|
+| Diriger | Flèches ou ZQSD (WASD) | Glisser le doigt |
+| Turbo | Espace | Bouton TURBO |
+| Recommencer | R | Bouton « Rejouer » |
+| Quitter la course | Échap | Bouton « Explorer » |
+
+- ⚡ **Orbes bleus** : ils rechargent le turbo.
+- ☄️ **Astéroïdes, planètes, soleil** : chaque choc coûte **1 seconde**.
+- 👻 **Fantôme** : ton meilleur tour est rejoué en transparent à côté de toi.
+- 🥇🥈🥉 **Médailles** : les temps à battre dépendent de la longueur du circuit.
+- 🔭 **Mode Explorer** : pour se balader dans la galaxie et lire la fiche de chaque planète.
+
+Les planètes repartent toujours de la même position au départ : tout le monde court sur le même circuit
+et peut comparer ses temps (bouton « Partager mon temps »).
 
 ---
 
 ## 🪐 Ajouter ta planète (5 minutes, sans rien installer)
+
+Ta planète apparaît dans la galaxie **et** devient un nouveau portail de la course.
 
 1. En haut de cette page, clique sur **Fork**. Ça crée ta propre copie du projet.
 2. Dans ta copie, ouvre le fichier [`js/planetes.js`](js/planetes.js) et clique sur le crayon ✏️ pour le modifier.
@@ -45,12 +70,12 @@ _« ajoute ma planète dans js/planetes.js : nom X, type lave, couleurs rouge et
 
 Tu peux aussi modifier le site lui-même. Quelques idées si tu ne sais pas par où commencer :
 
-- ☄️ Des comètes qui traversent l'écran de temps en temps
-- 🛸 Un vaisseau qu'on pilote au clavier entre les planètes
+- 🛸 Choisir la couleur ou la forme de son vaisseau
+- ☄️ Des comètes qui traversent le circuit pendant la course
+- 💥 Un bonus "bouclier" qui protège d'un choc
 - 🌗 Un nouveau type de planète (désert, cristal, toxique…)
-- 🔭 Un mode "visite guidée" qui passe automatiquement d'une planète à l'autre
-- 🎶 Une musique différente quand on s'approche de chaque planète
-- 📱 Améliorer l'affichage sur téléphone
+- 🎶 Une musique qui accélère pendant le dernier tour
+- 📱 Améliorer les commandes sur téléphone
 
 Fais tes changements sur ton fork, puis ouvre une pull request en expliquant ce que tu as ajouté.
 
@@ -62,7 +87,9 @@ Fais tes changements sur ton fork, puis ouvre une pull request en expliquant ce 
 index.html        → la page (structure)
 style.css         → l'apparence des boutons, textes et panneaux
 js/planetes.js    → LA LISTE DES PLANÈTES (c'est ici qu'on ajoute la sienne)
-js/main.js        → le moteur 3D (soleil, orbites, caméra, sons…)
+js/main.js        → la galaxie en 3D (soleil, planètes, mode Explorer)
+js/course.js      → le jeu (vaisseau, portails, astéroïdes, chrono, fantôme)
+js/son.js         → la musique et les bruitages
 ```
 
 La 3D est faite avec [Three.js](https://threejs.org). Il n'y a **aucune image** et **aucun fichier son** :

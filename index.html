@@ -26,8 +26,11 @@
     <div class="intro-contenu">
       <p class="sur-titre">PROJET OPEN SOURCE · CONSTRUIT À PLUSIEURS</p>
       <h1 class="titre">LA GALAXIE</h1>
-      <p class="sous-titre">Chaque planète a été ajoutée par quelqu'un.<br>Il reste des orbites libres.</p>
-      <button id="btn-entrer" disabled>Chargement…</button>
+      <p class="sous-titre">Pilote ton vaisseau à travers les planètes ajoutées par chacun.<br>Chaque nouvelle planète agrandit le circuit.</p>
+      <div class="choix">
+        <button id="btn-course" class="gros" disabled>Chargement…</button>
+        <button id="btn-explorer" disabled>🔭 Explorer la galaxie</button>
+      </div>
       <p class="astuce">🎧 Avec le son, c'est mieux</p>
     </div>
   </section>
@@ -42,6 +45,7 @@
       </div>
     </div>
     <nav class="boutons">
+      <button id="btn-mode">🏁 Course</button>
       <button id="btn-annuaire" title="Liste des planètes">☰ Planètes</button>
       <button id="btn-son" title="Son">🔇</button>
       <button id="btn-qualite" title="Qualité graphique"></button>
@@ -57,6 +61,42 @@
   </aside>
 
   <p id="aide" class="cache">Glisse pour tourner · Molette ou pincer pour zoomer · Clique sur une planète</p>
+
+  <!-- Course -->
+  <div id="hud-course">
+    <div class="chrono">
+      <b id="c-temps">0:00.00</b>
+      <div class="infos"><span id="c-tour"></span><span id="c-portail"></span><span id="c-record"></span></div>
+    </div>
+    <div class="bas">
+      <span id="c-vitesse"></span>
+      <div id="c-turbo" class="turbo"><small>TURBO</small><div class="jauge"><i id="c-jauge"></i></div></div>
+    </div>
+    <p class="aide-course">Flèches ou ZQSD : diriger · Espace : turbo · R : recommencer · Échap : explorer</p>
+  </div>
+  <div id="cible" class="cache"><span id="cible-fleche" class="fleche">▲</span><span class="viseur"></span><small id="cible-dist"></small></div>
+  <div id="decompte"></div>
+  <div id="message"></div>
+  <div id="flash"></div>
+  <div id="tactile">
+    <div id="joystick"><i id="joystick-manette"></i></div>
+    <button id="btn-turbo">TURBO</button>
+  </div>
+  <section id="resultat" class="cache">
+    <div class="carte-resultat">
+      <p class="sur-titre">COURSE TERMINÉE</p>
+      <div id="r-medaille" class="medaille"></div>
+      <h2 id="r-temps"></h2>
+      <p id="r-detail"></p>
+      <p id="r-objectifs"></p>
+      <div class="actions">
+        <button id="r-rejouer" class="primaire">↻ Rejouer</button>
+        <button id="r-partager">Partager mon temps</button>
+        <button id="r-explorer">🔭 Explorer</button>
+      </div>
+      <p id="r-note"></p>
+    </div>
+  </section>
 
   <script type="module" src="js/main.js"></script>
 </body>
