@@ -1,14 +1,18 @@
 // =====================================================================
 //  LA GALAXIE — la course
-//  Un vaisseau, un portail à côté de chaque planète, un chrono.
+//  Départ près du Soleil, puis un portail à côté de chaque planète,
+//  de la plus proche à la plus lointaine. Le dernier portail = l'arrivée.
 //  Chaque planète ajoutée dans planetes.js ajoute un portail au circuit.
 // =====================================================================
 import * as THREE from 'three';
 import * as son from './son.js';
+import { creerPersonnage } from './personnages.js';
 
 const VITESSE = 22;          // vitesse de croisière
 const VITESSE_TURBO = 46;    // vitesse avec le turbo
 const PAS_FANTOME = 0.1;     // le fantôme enregistre une position tous les 0,1 s
+const DUREE_SAUT = 2.6;      // durée du saut en hyperespace avant le départ
+const RAYON_SOLEIL = 12;     // distance de choc avec le Soleil
 
 function lire(cle) { try { return localStorage.getItem(cle); } catch { return null; } }
 function ecrire(cle, v) { try { localStorage.setItem(cle, v); } catch { /* stockage indisponible */ } }
@@ -29,62 +33,6 @@ export function formaterTemps(s) {
   if (s == null || !isFinite(s)) return '—';
   const m = Math.floor(s / 60);
   return `${m}:${(s - m * 60).toFixed(2).padStart(5, '0')}`;
-}
-
-// ---------- Le vaisseau (le nez pointe vers -Z) ----------
-function creerVaisseau(halo, fantome = false) {
-  const racine = new THREE.Group();
-  const modele = new THREE.Group();
-  racine.add(modele);
-  const mat = (options) => (fantome
-    ? new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending })
-    : new THREE.MeshStandardMaterial(options));
-  const coque = mat({ color: 0xe6ebf7, metalness: 0.55, roughness: 0.3 });
-  const accent = mat({ color: 0x7c5cff, metalness: 0.4, roughness: 0.4, emissive: 0x3b1fd1, emissiveIntensity: 0.7 });
-  const vitre = mat({ color: 0x66e0ff, metalness: 0.2, roughness: 0.1, emissive: 0x1aa7ff, emissiveIntensity: 0.8 });
-  const sombre = mat({ color: 0x2a3142, metalness: 0.6, roughness: 0.5 });
-
-  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.42, 2.6, 14), coque);
-  fuselage.rotation.x = -Math.PI / 2;
-  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 14), vitre);
-  cockpit.scale.set(1, 0.75, 2);
-  cockpit.position.set(0, 0.24, -0.15);
-  modele.add(fuselage, cockpit);
-
-  const tuyeres = [];
-  const lueurs = [];
-  for (const s of [-1, 1]) {
-    const aile = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.07, 0.75), coque);
-    aile.position.set(s * 0.85, -0.05, 0.55);
-    aile.rotation.y = -s * 0.38;
-    const bande = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.16), accent);
-    bande.position.set(s * 0.8, -0.03, 0.42);
-    bande.rotation.y = -s * 0.38;
-    const derive = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.55), accent);
-    derive.position.set(s * 1.5, 0.15, 0.85);
-    const reacteur = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, 0.8, 14), sombre);
-    reacteur.rotation.x = -Math.PI / 2;
-    reacteur.position.set(s * 0.38, -0.02, 1.15);
-    modele.add(aile, bande, derive, reacteur);
-
-    const tuyere = new THREE.Vector3(s * 0.38, -0.02, 1.58);
-    tuyeres.push(tuyere);
-    if (!fantome) {
-      const disque = new THREE.Mesh(
-        new THREE.CircleGeometry(0.15, 16),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(0x66e0ff).multiplyScalar(2) }),
-      );
-      disque.position.copy(tuyere);
-      const lueur = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: halo, color: 0x5cc8ff, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending,
-      }));
-      lueur.position.copy(tuyere).z += 0.2;
-      lueur.scale.setScalar(1.2);
-      modele.add(disque, lueur);
-      lueurs.push(lueur);
-    }
-  }
-  return { racine, modele, tuyeres, lueurs };
 }
 
 // Un rocher : une sphère facettée, cabossée au hasard
@@ -145,10 +93,10 @@ function creerParticules(scene, halo, n) {
   };
 }
 
-export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, signature, quandQuitter }) {
+export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, signature, quandQuitter, quandChangerPerso }) {
   const $ = (id) => document.getElementById(id);
   const ui = {
-    temps: $('c-temps'), tour: $('c-tour'), portail: $('c-portail'), record: $('c-record'),
+    temps: $('c-temps'), portail: $('c-portail'), prochain: $('c-prochain'), record: $('c-record'),
     jauge: $('c-jauge'), jaugeBoite: $('c-turbo'), vitesse: $('c-vitesse'),
     cible: $('cible'), fleche: $('cible-fleche'), cibleDist: $('cible-dist'),
     decompte: $('decompte'), message: $('message'), flash: $('flash'),
@@ -165,24 +113,31 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   const couleurChoc = new THREE.Color(0xffa45c).multiplyScalar(2);
   const couleurOrbe = new THREE.Color(0x5ef2ff).multiplyScalar(2);
 
-  // ---------- Vaisseau, fantôme, particules ----------
-  const vaisseau = creerVaisseau(halo);
-  vaisseau.racine.visible = false;
-  const fantome = creerVaisseau(halo, true);
-  fantome.racine.visible = false;
-  scene.add(vaisseau.racine, fantome.racine);
+  // ---------- Personnage, fantôme, particules ----------
+  let vaisseau = null, fantome = null;
+  function changerPersonnage(id) {
+    if (vaisseau?.id === id) return;
+    if (vaisseau) scene.remove(vaisseau.racine, fantome.racine);
+    vaisseau = creerPersonnage(id, halo);
+    fantome = creerPersonnage(id, halo, true);
+    vaisseau.racine.visible = fantome.racine.visible = false;
+    scene.add(vaisseau.racine, fantome.racine);
+  }
+  changerPersonnage('vaisseau');
   const particules = creerParticules(scene, halo, haute ? 2500 : 1200);
 
-  // ---------- Portails : la ligne de départ + un par planète ----------
-  let corpsPortails = corps.filter((c) => c.type === 'planete');
-  if (!corpsPortails.length) corpsPortails = corps.filter((c) => c.type === 'libre').slice(0, 3);
-  const nbTours = corpsPortails.length <= 4 ? 3 : corpsPortails.length <= 8 ? 2 : 1;
-  const rayonMax = Math.max(...corpsPortails.map((c) => c.R)) + 14;
+  // ---------- Portails : la ligne de départ + un par planète, du centre vers l'extérieur ----------
+  const corpsPortails = corps.filter((c) => c.type === 'planete').sort((a, b) => a.R - b.R);
+  const rayonMax = Math.max(30, ...corpsPortails.map((c) => c.R)) + 20;
+  const positionDepart = new THREE.Vector3(0, 6, 17);
 
-  function creerPortail(teinte, rayon, corpsLie) {
+  function creerPortail(teinte, rayon, corpsLie, couleurDeco = null) {
     const couleur = new THREE.Color(teinte);
     const groupe = new THREE.Group();
     const matAnneau = new THREE.MeshBasicMaterial({ color: couleur.clone().multiplyScalar(2.2), transparent: true });
+    const matDeco = couleurDeco
+      ? new THREE.MeshBasicMaterial({ color: new THREE.Color(couleurDeco).multiplyScalar(2.4), transparent: true })
+      : matAnneau;
     const anneau = new THREE.Mesh(new THREE.TorusGeometry(rayon, 0.22, 12, 72), matAnneau);
     const matDisque = new THREE.MeshBasicMaterial({
       color: couleur, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -192,39 +147,50 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     const geoDeco = new THREE.OctahedronGeometry(0.38, 0);
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
-      const d = new THREE.Mesh(geoDeco, matAnneau);
+      const d = new THREE.Mesh(geoDeco, matDeco);
       d.position.set(Math.cos(a) * (rayon + 0.7), Math.sin(a) * (rayon + 0.7), 0);
       deco.add(d);
     }
     groupe.add(anneau, disque, deco);
     groupe.visible = false;
     scene.add(groupe);
-    return { groupe, deco, matAnneau, matDisque, couleur, rayon, corps: corpsLie, centre: new THREE.Vector3(), normale: new THREE.Vector3(), pulse: 0 };
+    return {
+      groupe, deco, matAnneau, matDeco, matDisque, couleur, rayon, corps: corpsLie,
+      nom: corpsLie?.data?.nom || 'Départ', centre: new THREE.Vector3(), normale: new THREE.Vector3(), pulse: 0,
+    };
   }
   const portails = [
     creerPortail('#ffd27a', 5.5, null),
-    ...corpsPortails.map((c) => creerPortail(c.data?.couleur || '#9fb0ff', 4.5, c)),
+    ...corpsPortails.map((c, i) => creerPortail(
+      c.data?.couleur || '#9fb0ff',
+      i === corpsPortails.length - 1 ? 5.5 : 4.5,
+      c,
+      i === corpsPortails.length - 1 ? '#ffd27a' : null,
+    )),
   ];
+  const dernier = portails.length - 1;
 
   // Un grand rayon lumineux vertical sur le prochain portail, pour le repérer de loin
   const faisceau = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.7, 0.7, 140, 16, 1, true),
+    new THREE.CylinderGeometry(0.8, 0.8, 160, 16, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
   );
   faisceau.visible = false;
   scene.add(faisceau);
 
+  // Chaque portail flotte juste derrière sa planète (dans le sens de son orbite)
   function placerPortails() {
-    portails[0].centre.set(0, 9, 15);
+    portails[0].centre.copy(positionDepart);
     for (const p of portails) {
       if (!p.corps) continue;
-      const pos = p.corps.holder.position;
-      v1.set(pos.x, 0, pos.z).normalize();
-      p.centre.copy(pos).addScaledVector(v1, p.corps.rayon * 2.6 + p.rayon + 1);
+      const c = p.corps;
+      const ecart = (c.data?.anneaux ? c.rayon * 2.5 : c.rayon * 1.6) + p.rayon + 1.5;
+      v1.set(Math.sin(c.angle), 0, -Math.cos(c.angle));
+      p.centre.copy(c.holder.position).addScaledVector(v1, ecart);
     }
-    const n = portails.length;
     portails.forEach((p, i) => {
-      p.normale.subVectors(portails[(i + 1) % n].centre, portails[(i - 1 + n) % n].centre);
+      const prec = portails[Math.max(i - 1, 0)].centre, suiv = portails[Math.min(i + 1, dernier)].centre;
+      p.normale.subVectors(suiv, prec);
       if (p.normale.lengthSq() < 1e-6) p.normale.set(0, 0, 1);
       p.normale.normalize();
       p.groupe.position.copy(p.centre);
@@ -232,8 +198,8 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     });
   }
 
-  // ---------- Astéroïdes ----------
-  const nbAsteroides = haute ? 130 : 80;
+  // ---------- Astéroïdes (le long du parcours) ----------
+  const nbAsteroides = haute ? 190 : 110;
   const champ = new THREE.InstancedMesh(
     rocher(),
     new THREE.MeshStandardMaterial({ color: 0x9a8f86, roughness: 0.95, flatShading: true }),
@@ -248,10 +214,13 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   const objet = new THREE.Object3D();
 
   function placerAsteroide(a, rnd, eviter) {
+    const n = portails.length;
     for (let essai = 0; essai < 25; essai++) {
-      const ang = rnd() * Math.PI * 2, R = 14 + rnd() * (rayonMax - 14);
-      a.p.set(Math.cos(ang) * R, (rnd() - 0.5) * 14, Math.sin(ang) * R);
-      if (!eviter.some(([c, d]) => a.p.distanceTo(c) < d)) break;
+      // Un point au hasard autour d'un tronçon du parcours
+      const i = Math.floor(rnd() * (n - 1));
+      a.p.lerpVectors(portails[i].centre, portails[i + 1].centre, 0.1 + rnd() * 0.8)
+        .add(v1.set(rnd() - 0.5, (rnd() - 0.5) * 0.5, rnd() - 0.5).multiplyScalar(28));
+      if (a.p.length() > RAYON_SOLEIL + 4 && !eviter.some(([c, d]) => a.p.distanceTo(c) < d)) break;
     }
     a.r = 0.8 + Math.pow(rnd(), 2) * 2.2;
     a.rot.set(rnd() * 6, rnd() * 6, rnd() * 6);
@@ -273,7 +242,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   // ---------- Orbes d'énergie (rechargent le turbo) ----------
   const geoOrbe = new THREE.IcosahedronGeometry(0.45, 2);
   const matOrbe = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x5ef2ff).multiplyScalar(2.5) });
-  const orbes = Array.from({ length: 60 }, () => {
+  const orbes = Array.from({ length: 80 }, () => {
     const mesh = new THREE.Mesh(geoOrbe, matOrbe);
     const lueur = new THREE.Sprite(new THREE.SpriteMaterial({
       map: halo, color: 0x5ef2ff, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -288,14 +257,13 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   function placerOrbes(rnd) {
     orbes.forEach((o) => { o.actif = false; o.mesh.visible = false; });
     let k = 0;
-    const n = portails.length;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < dernier; i++) {
       for (const t of [0.3, 0.5, 0.7]) {
         if (k >= orbes.length) return;
         const o = orbes[k++];
-        o.base.lerpVectors(portails[i].centre, portails[(i + 1) % n].centre, t)
+        o.base.lerpVectors(portails[i].centre, portails[i + 1].centre, t)
           .add(v1.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(6));
-        if (o.base.length() < 11) o.base.setLength(11);
+        if (o.base.length() < RAYON_SOLEIL + 2) o.base.setLength(RAYON_SOLEIL + 2);
         o.actif = true;
         o.mesh.visible = true;
         o.mesh.position.copy(o.base);
@@ -304,18 +272,19 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   }
 
   // ---------- État de la course ----------
-  let etat = 'inactif';  // inactif → decompte → course → fini
+  let etat = 'inactif';  // inactif → saut → decompte → course → fini
   let cap = 0, tangage = 0, vitesse = 0, turbo = 1, enTurbo = false;
-  let tCourse = 0, penalites = 0, tour = 1, cible = 1, tDecompte = 0, chiffre = 0;
+  let tCourse = 0, penalites = 0, cible = 1, tDecompte = 0, chiffre = 0, tSaut = 0;
   let secousse = 0, invincible = 0, angleFin = 0, tFeux = 0, prochainFeu = 0;
   let enregistrement = [], prochainEchantillon = 0, fantomeData = null;
   let longueurCircuit = 0, recordActuel = null, dernierTemps = 0, derniereMedaille = '';
   const dir = new THREE.Vector3();
+  const departSaut = new THREE.Vector3();
 
   function chargerFantome() {
     try {
       const d = JSON.parse(lire(cleFantome));
-      return Array.isArray(d) && d.length > 1 ? d : null;
+      return Array.isArray(d?.points) && d.points.length > 1 ? d : null;
     } catch { return null; }
   }
 
@@ -329,14 +298,17 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
       c.angle = c.angleDepart;
       c.holder.position.set(Math.cos(c.angle) * c.R, 0, Math.sin(c.angle) * c.R);
     }
+    // La ligne de départ est placée près du Soleil, du côté du premier portail
+    placerPortails();
+    const premier = portails[1] || portails[0];
+    const a = Math.atan2(premier.centre.z, premier.centre.x) - 0.9;
+    positionDepart.set(Math.cos(a) * 17, 6, Math.sin(a) * 17);
     placerPortails();
     longueurCircuit = 0;
-    portails.forEach((p, i) => { longueurCircuit += p.centre.distanceTo(portails[(i + 1) % portails.length].centre); });
-    longueurCircuit *= nbTours;
+    for (let i = 0; i < dernier; i++) longueurCircuit += portails[i].centre.distanceTo(portails[i + 1].centre);
 
-    const depart = portails[0], premier = portails[1] || portails[0];
-    v1.subVectors(premier.centre, depart.centre).normalize();
-    vaisseau.racine.position.copy(depart.centre).addScaledVector(v1, -8);
+    v1.subVectors(premier.centre, positionDepart).normalize();
+    vaisseau.racine.position.copy(positionDepart).addScaledVector(v1, -8);
     dir.subVectors(premier.centre, vaisseau.racine.position).normalize();
     cap = Math.atan2(-dir.x, -dir.z);
     tangage = Math.asin(clamp(dir.y, -1, 1));
@@ -345,19 +317,30 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
 
     const rnd = aleatoire(1234);
     const eviter = [[vaisseau.racine.position, 18], ...portails.map((p) => [p.centre, p.rayon + 4])];
-    asteroides.forEach((a) => placerAsteroide(a, rnd, eviter));
+    for (const c of corps) if (c.type === 'planete') eviter.push([c.holder.position, c.rayon * 2.6 + 3]);
+    asteroides.forEach((ast) => placerAsteroide(ast, rnd, eviter));
     placerOrbes(rnd);
     particules.vider();
 
     vitesse = 0; turbo = 1; enTurbo = false;
-    tCourse = 0; penalites = 0; tour = 1; cible = 1 % portails.length;
-    tDecompte = 3; chiffre = 4; secousse = 0; invincible = 0; tFeux = 0;
+    tCourse = 0; penalites = 0; cible = Math.min(1, dernier);
+    secousse = 0; invincible = 0; tFeux = 0;
     enregistrement = []; prochainEchantillon = 0;
     fantomeData = chargerFantome();
     recordActuel = Number(lire(cleRecord)) || null;
-    etat = 'decompte';
     ui.resultat.classList.add('cache');
     ui.decompte.textContent = '';
+
+    // Saut en hyperespace : la caméra arrive de très loin, à toute vitesse
+    etat = 'saut';
+    tSaut = 0;
+    departSaut.copy(vaisseau.racine.position).addScaledVector(dir, -380).add(v1.set(0, 50, 0));
+    camera.position.copy(departSaut);
+    camera.fov = 100;
+    camera.updateProjectionMatrix();
+    hyperespace.lignes.visible = true;
+    hyperespace.lignes.material.opacity = 0.9;
+    son.bruitage('hyperespace');
   }
 
   // ---------- Effets à l'écran ----------
@@ -470,7 +453,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     r.position.addScaledVector(dir, vitesse * dt);
     // Les bords de la zone renvoient doucement le vaisseau vers le centre
     if (r.position.length() > rayonMax + 25) rebondir(v1.copy(r.position).negate().normalize());
-    if (Math.abs(r.position.y) > 35) rebondir(v1.set(0, -Math.sign(r.position.y), 0));
+    if (Math.abs(r.position.y) > 45) rebondir(v1.set(0, -Math.sign(r.position.y), 0));
     r.rotation.set(tangage, cap, 0, 'YXZ');
     const m = vaisseau.modele;
     m.rotation.z += (-x * 0.8 - m.rotation.z) * (1 - Math.exp(-dt * 6));
@@ -504,9 +487,9 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   function collisions(dt) {
     invincible -= dt;
     const pos = vaisseau.racine.position;
-    if (pos.length() < 10) {
+    if (pos.length() < RAYON_SOLEIL) {
       const n = v1.copy(pos).normalize().clone();
-      pos.copy(n).multiplyScalar(10.05);
+      pos.copy(n).multiplyScalar(RAYON_SOLEIL + 0.05);
       rebondir(n);
       choc(pos.clone());
     }
@@ -523,7 +506,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     for (const a of asteroides) {
       if (pos.distanceTo(a.p) < a.r * 0.85 + 0.8 && invincible <= 0) {
         choc(a.p.clone());
-        placerAsteroide(a, Math.random, [[pos, 40]]);
+        placerAsteroide(a, Math.random, [[pos, 40], ...portails.map((p) => [p.centre, p.rayon + 4])]);
       }
     }
   }
@@ -545,21 +528,15 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     if (vaisseau.racine.position.distanceTo(p.centre) > p.rayon * 1.1) return;
     p.pulse = 1;
     flash(p.couleur, 0.3);
-    son.bruitage('portail', (tour - 1) * portails.length + cible);
+    son.bruitage('portail', cible);
     for (let k = 0; k < 48; k++) {
       const a = (k / 48) * Math.PI * 2;
       v2.set(Math.cos(a) * p.rayon, Math.sin(a) * p.rayon, 0).applyQuaternion(p.groupe.quaternion).add(p.centre);
       particules.emettre(v2, v3.subVectors(v2, p.centre).normalize().multiplyScalar(7), p.couleur.clone().multiplyScalar(2.2), 0.9);
     }
-    if (cible === 0) {
-      if (tour >= nbTours) { terminer(); return; }
-      tour++;
-      message(tour === nbTours ? 'DERNIER TOUR !' : `TOUR ${tour}/${nbTours}`, 'grand');
-      placerOrbes(aleatoire(tour * 97));
-    } else {
-      message(`PORTAIL ${cible}/${portails.length}`);
-    }
-    cible = (cible + 1) % portails.length;
+    if (cible === dernier) { terminer(); return; }
+    cible++;
+    message(cible === dernier ? `${p.nom.toUpperCase()} ✓  ·  DERNIER PORTAIL !` : `${p.nom.toUpperCase()} ✓`, cible === dernier ? 'grand' : '');
   }
 
   function enregistrerFantome() {
@@ -572,9 +549,10 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
 
   function majFantome() {
     const f = fantome.racine;
+    const pts = fantomeData?.points;
     const i = Math.floor(tCourse / PAS_FANTOME);
-    if (!fantomeData || (etat !== 'course' && etat !== 'decompte') || i >= fantomeData.length - 1) { f.visible = false; return; }
-    const a = fantomeData[i], b = fantomeData[i + 1], k = tCourse / PAS_FANTOME - i;
+    if (!pts || (etat !== 'course' && etat !== 'decompte') || i >= pts.length - 1) { f.visible = false; return; }
+    const a = pts[i], b = pts[i + 1], k = tCourse / PAS_FANTOME - i;
     f.visible = true;
     f.position.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
     f.rotation.set(lerp(a[4], b[4], k), lerp(a[3], b[3], k), 0, 'YXZ');
@@ -587,7 +565,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     const nouveau = ancien === null || temps < ancien;
     if (nouveau) {
       ecrire(cleRecord, String(temps));
-      ecrire(cleFantome, JSON.stringify(enregistrement));
+      ecrire(cleFantome, JSON.stringify({ perso: vaisseau.id, points: enregistrement }));
       recordActuel = temps;
     }
     const obj = objectifs();
@@ -601,9 +579,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
       : `Ton record : ${formaterTemps(ancien)}`;
     ui.rDetail.classList.toggle('record', nouveau);
     ui.rObjectifs.textContent = `🥇 ${formaterTemps(obj.or)}   🥈 ${formaterTemps(obj.argent)}   🥉 ${formaterTemps(obj.bronze)}`;
-    ui.rNote.textContent = penalites
-      ? `Dont ${penalites} s de pénalité (chocs)`
-      : 'Aucun choc, pilotage parfait 👌';
+    ui.rNote.textContent = penalites ? `Dont ${penalites} s de pénalité (chocs)` : 'Aucun choc, pilotage parfait 👌';
     angleFin = cap;
     tFeux = 2.4;
     prochainFeu = 0;
@@ -614,8 +590,9 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
 
   $('r-rejouer').addEventListener('click', () => reinitialiser());
   $('r-explorer').addEventListener('click', () => quandQuitter());
+  $('r-perso').addEventListener('click', () => quandChangerPerso());
   $('r-partager').addEventListener('click', async () => {
-    const texte = `J'ai bouclé La Galaxie en ${formaterTemps(dernierTemps)} ${derniereMedaille} Tu fais mieux ? 👉 ${location.origin}${location.pathname}`;
+    const texte = `J'ai traversé La Galaxie en ${formaterTemps(dernierTemps)} ${derniereMedaille} Tu fais mieux ? 👉 ${location.origin}${location.pathname}`;
     try {
       if (navigator.share) { await navigator.share({ text: texte }); return; }
       await navigator.clipboard.writeText(texte);
@@ -627,21 +604,38 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
 
   // ---------- Caméra qui suit le vaisseau ----------
   const camCible = new THREE.Vector3(), regard = new THREE.Vector3(), orientation = new THREE.Euler();
+  function positionPoursuite() {
+    // Sur un écran en hauteur (téléphone), on recule un peu pour voir autour du vaisseau
+    const recul = camera.aspect < 1 ? 1.45 : 1;
+    orientation.set(tangage * 0.5, cap, 0, 'YXZ');
+    return camCible.set(0, 2.3 * recul, 7.5 * recul).applyEuler(orientation).add(vaisseau.racine.position);
+  }
+
   function majCamera(dt) {
     const r = vaisseau.racine;
+    const lignes = hyperespace.lignes;
+    lignes.visible = true;
+    if (etat === 'saut') {
+      const p = Math.min(tSaut / DUREE_SAUT, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      camera.position.lerpVectors(departSaut, positionPoursuite(), e);
+      camera.lookAt(regard.copy(dir).multiplyScalar(12).add(r.position));
+      camera.fov = 100 - 34 * e;
+      camera.updateProjectionMatrix();
+      lignes.material.opacity = 0.9 * (1 - p);
+      hyperespace.maj(dt, 3200 * (1 - e) + 200);
+      return;
+    }
     if (etat === 'fini') {
       angleFin += dt * 0.35;
       camCible.set(Math.sin(angleFin) * 11, 3.5, Math.cos(angleFin) * 11).add(r.position);
       regard.copy(r.position);
     } else {
-      orientation.set(tangage * 0.5, cap, 0, 'YXZ');
-      // Sur un écran en hauteur (téléphone), on recule un peu pour voir autour du vaisseau
-      const recul = camera.aspect < 1 ? 1.45 : 1;
-      camCible.set(0, 2.3 * recul, 7.5 * recul).applyEuler(orientation).add(r.position);
+      positionPoursuite();
       regard.copy(dir).multiplyScalar(12).add(r.position);
       regard.y += 0.8;
     }
-    camera.position.lerp(camCible, 1 - Math.exp(-dt * (etat === 'decompte' ? 2.5 : 7)));
+    camera.position.lerp(camCible, 1 - Math.exp(-dt * 7));
     secousse *= Math.exp(-dt * 4);
     const s = secousse * 0.5 + (enTurbo ? 0.05 : 0);
     if (s > 0.001) camera.position.add(v1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(s));
@@ -651,8 +645,6 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     camera.updateProjectionMatrix();
 
     // Traits d'hyperespace quand le turbo est allumé
-    const lignes = hyperespace.lignes;
-    lignes.visible = true;
     lignes.material.opacity += ((enTurbo ? 0.55 : 0) - lignes.material.opacity) * (1 - Math.exp(-dt * 5));
     hyperespace.maj(dt, 300 + vitesse * 40);
   }
@@ -675,9 +667,11 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
   function majPortails(dt, t) {
     portails.forEach((p, i) => {
       const actif = i === cible && etat !== 'fini';
+      const passe = i < cible || etat === 'fini';
       p.pulse = Math.max(0, p.pulse - dt * 2);
       p.groupe.scale.setScalar(1 + p.pulse * 0.6 + (actif ? Math.sin(t * 5) * 0.04 : 0));
-      p.matAnneau.opacity = actif ? 1 : 0.22;
+      p.matAnneau.opacity = actif ? 1 : passe ? 0.08 : 0.22;
+      p.matDeco.opacity = p.matAnneau.opacity;
       p.matDisque.opacity = actif ? 0.1 + Math.sin(t * 3) * 0.04 : 0.02;
       p.deco.rotation.z += dt * (actif ? 1.2 : 0.3);
     });
@@ -688,8 +682,8 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
 
   function majHud() {
     ui.temps.textContent = formaterTemps(tCourse + penalites);
-    ui.tour.textContent = `TOUR ${Math.min(tour, nbTours)}/${nbTours}`;
-    ui.portail.textContent = `PORTAIL ${cible === 0 ? portails.length : cible}/${portails.length}`;
+    ui.portail.textContent = `PORTAIL ${cible}/${dernier}`;
+    ui.prochain.textContent = cible === dernier ? `🏁 ${portails[cible].nom.toUpperCase()}` : `▸ ${portails[cible].nom.toUpperCase()}`;
     ui.record.textContent = `RECORD ${formaterTemps(recordActuel)}`;
     ui.jauge.style.width = `${turbo * 100}%`;
     ui.jaugeBoite.classList.toggle('actif', enTurbo);
@@ -711,7 +705,7 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     ui.cible.classList.toggle('bord', !dedans);
     ui.fleche.style.transform = `rotate(${Math.PI / 2 - Math.atan2(y, x)}rad)`;
     ui.cible.style.setProperty('--teinte', '#' + p.couleur.getHexString());
-    ui.cibleDist.textContent = `${Math.round(vaisseau.racine.position.distanceTo(p.centre) * 1000).toLocaleString('fr-FR')} km`;
+    ui.cibleDist.textContent = `${p.nom} · ${Math.round(vaisseau.racine.position.distanceTo(p.centre) * 1000).toLocaleString('fr-FR')} km`;
   }
 
   // ---------- Boucle (appelée à chaque image par main.js) ----------
@@ -726,9 +720,15 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
       o.mesh.rotation.y += dt * 2;
     }
     majPortails(dt, t);
+    vaisseau.animer(t);
+    fantome.animer(t);
 
     const { x, y, boost } = lireCommandes();
-    if (etat === 'decompte') {
+    if (etat === 'saut') {
+      tSaut += dt;
+      piloter(0, 0, false, dt, false, 0);
+      if (tSaut >= DUREE_SAUT) { etat = 'decompte'; tDecompte = 3; chiffre = 4; }
+    } else if (etat === 'decompte') {
       tDecompte -= dt;
       const n = Math.ceil(tDecompte);
       if (n !== chiffre && n > 0) { chiffre = n; afficherDecompte(String(n)); son.bruitage('bip'); }
@@ -760,8 +760,9 @@ export function creerCourse({ scene, camera, corps, hyperespace, halo, haute, si
     majCibleEcran();
   }
 
-  function demarrer() {
+  function demarrer(idPerso) {
     document.activeElement?.blur?.();
+    changerPersonnage(idPerso);
     vaisseau.racine.visible = champ.visible = particules.points.visible = true;
     portails.forEach((p) => { p.groupe.visible = true; });
     camera.clearViewOffset();

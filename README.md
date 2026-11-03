@@ -1,8 +1,8 @@
 # 🌌 La Galaxie
 
-**Une course de vaisseaux en 3D, sur un circuit construit à plusieurs.**
-Chaque planète de la galaxie a été ajoutée par une personne différente, et chaque planète ajoute
-un portail au circuit. Plus il y a de monde, plus la course est longue.
+**Une course spatiale en 3D, du Soleil jusqu'aux planètes de la classe.**
+Le circuit traverse les 8 vraies planètes du système solaire, puis les planètes ajoutées par
+chaque personne qui contribue au projet. Chaque nouvelle planète = un nouveau portail.
 
 👉 **Jouer : https://hdeligondes8.github.io/la-galaxie/**
 
@@ -12,8 +12,10 @@ Le projet est **open source** : tout le monde peut voir le code, le copier et l'
 
 ## 🏁 Le jeu
 
-Pilote ton vaisseau à travers les **portails** placés à côté de chaque planète, dans l'ordre,
-puis repasse la ligne de départ dorée. Fais les tours le plus vite possible.
+Choisis ton pilote (vaisseau, scooter spatial, soucoupe, fusée rétro, canard géant ou baleine cosmique),
+saute en hyperespace jusqu'à la ligne de départ, puis traverse **une fois** le portail de chaque planète,
+dans l'ordre : Mercure, Vénus, la Terre… Neptune, puis les planètes de la classe.
+L'anneau qui brille indique le prochain portail. Le dernier portail (bordé d'or) est l'arrivée.
 
 | | Ordinateur | Téléphone |
 |---|---|---|
@@ -24,9 +26,11 @@ puis repasse la ligne de départ dorée. Fais les tours le plus vite possible.
 
 - ⚡ **Orbes bleus** : ils rechargent le turbo.
 - ☄️ **Astéroïdes, planètes, soleil** : chaque choc coûte **1 seconde**.
-- 👻 **Fantôme** : ton meilleur tour est rejoué en transparent à côté de toi.
+- 👻 **Fantôme** : ta meilleure course est rejouée en transparent à côté de toi.
 - 🥇🥈🥉 **Médailles** : les temps à battre dépendent de la longueur du circuit.
-- 🔭 **Mode Explorer** : pour se balader dans la galaxie et lire la fiche de chaque planète.
+- 🔭 **Mode Explorer** : pour se balader dans la galaxie. Les vraies planètes ont une fiche avec
+  leurs vraies infos (taille, distance au Soleil, durée d'une année, température, anecdote).
+- 🤖 **Mode démo** : ajoute `?auto` à la fin de l'adresse et la course se pilote toute seule.
 
 Les planètes repartent toujours de la même position au départ : tout le monde court sur le même circuit
 et peut comparer ses temps (bouton « Partager mon temps »).
@@ -70,7 +74,7 @@ _« ajoute ma planète dans js/planetes.js : nom X, type lave, couleurs rouge et
 
 Tu peux aussi modifier le site lui-même. Quelques idées si tu ne sais pas par où commencer :
 
-- 🛸 Choisir la couleur ou la forme de son vaisseau
+- 🛸 Créer un nouveau personnage dans `js/personnages.js` (une moto, un dragon, un chat astronaute…)
 - ☄️ Des comètes qui traversent le circuit pendant la course
 - 💥 Un bonus "bouclier" qui protège d'un choc
 - 🌗 Un nouveau type de planète (désert, cristal, toxique…)
@@ -87,8 +91,10 @@ Fais tes changements sur ton fork, puis ouvre une pull request en expliquant ce 
 index.html        → la page (structure)
 style.css         → l'apparence des boutons, textes et panneaux
 js/planetes.js    → LA LISTE DES PLANÈTES (c'est ici qu'on ajoute la sienne)
-js/main.js        → la galaxie en 3D (soleil, planètes, mode Explorer)
-js/course.js      → le jeu (vaisseau, portails, astéroïdes, chrono, fantôme)
+js/systeme-solaire.js → les 8 vraies planètes et leurs infos
+js/personnages.js → les 6 personnages de la course
+js/main.js        → la galaxie en 3D (soleil, planètes, mode Explorer, choix du pilote)
+js/course.js      → le jeu (portails, astéroïdes, chrono, fantôme, hyperespace)
 js/son.js         → la musique et les bruitages
 ```
 

@@ -523,3 +523,55 @@ code {
   .jauge { width: 46vw; }
   .infos { gap: 8px; font-size: 10px; }
 }
+
+/* =====================================================================
+   CHOIX DU PERSONNAGE
+   ===================================================================== */
+#selection {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 16px 34px;
+  text-align: center;
+  background: linear-gradient(to top, rgba(2, 3, 10, .92) 40%, rgba(2, 3, 10, 0));
+  transition: opacity .6s ease;
+}
+.selecteur { display: flex; align-items: center; gap: 18px; }
+.selecteur > button {
+  width: 54px; height: 54px;
+  padding: 0;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.perso-texte { width: min(340px, 60vw); }
+#perso-nom { font-size: clamp(26px, 5vw, 38px); line-height: 1.1; }
+#perso-desc { color: var(--texte-doux); margin-top: 6px; min-height: 2.6em; }
+#perso-points { display: flex; gap: 8px; }
+#perso-points i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .25); }
+#perso-points i.actif { background: var(--accent2); box-shadow: 0 0 10px var(--accent2); }
+.lien-discret { border: none; background: none; backdrop-filter: none; color: var(--texte-doux); font-size: 13px; text-decoration: underline; }
+
+/* Fiches des vraies planètes */
+.temperature { margin-bottom: 12px; font-size: 14px; }
+.savais {
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(124, 92, 255, .14);
+  border: 1px solid rgba(124, 92, 255, .35);
+}
+.savais b { display: block; margin-bottom: 4px; color: #b9a8ff; }
+.stats b { font-size: 15px; }
+#annuaire .groupe {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--texte-doux);
+  padding: 10px 12px 4px;
+}
+.etiquette.reelle { font-style: italic; opacity: .8; }

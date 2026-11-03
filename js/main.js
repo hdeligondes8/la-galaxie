@@ -10,15 +10,18 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { planetes as planetesBrutes, depot } from './planetes.js';
+import { systemeSolaire } from './systeme-solaire.js';
 import * as son from './son.js';
 import { creerCourse } from './course.js';
+import { PERSONNAGES, creerPersonnage } from './personnages.js';
 
 // ---------- Réglages ----------
 const planetes = planetesBrutes.filter((p) => p && p.nom);
 const NB_ORBITES = Math.max(10, planetes.length + 3);
-const VUE_GENERALE = new THREE.Vector3(0, 75, 165);
+const VUE_GENERALE = new THREE.Vector3(0, 150, 320);
 const ORIGINE = new THREE.Vector3();
-const rayonOrbite = (i) => 22 + i * 12;
+// Les planètes de la classe tournent au-delà de Neptune (orbite 118)
+const rayonOrbite = (i) => 134 + i * 12;
 
 // ---------- Qualité (HD ou éco) ----------
 function lire(cle) { try { return localStorage.getItem(cle); } catch { return null; } }
@@ -121,7 +124,7 @@ function texturePlanete(p, seed, L) {
 
       if (type === 'gazeuse') {
         const w = fbm(sx * 1.8, sy * 1.8, sz * 1.8, 4);
-        const bande = 0.5 + 0.5 * Math.sin((sy * 5 + w * 2.4) * Math.PI);
+        const bande = 0.5 + 0.5 * Math.sin((sy * 5 + w * 2.4) * Math.PI) * (1 - (p.douceur || 0));
         const fin = 0.5 + 0.5 * Math.sin((sy * 28 + w * 7) * Math.PI);
         col = fois(melange(c1, c2, bande), 0.82 + fin * 0.28);
       } else if (type === 'glace') {
@@ -229,7 +232,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.enablePan = false;
 controls.minDistance = 10;
-controls.maxDistance = 700;
+controls.maxDistance = 1100;
 controls.enabled = false;
 
 // ---------- Lumières ----------
@@ -269,14 +272,14 @@ function galaxieSpirale() {
   const cCoeur = new THREE.Color('#ffb36b'), cBras = new THREE.Color('#6a7bff'), cRose = new THREE.Color('#ff4fd8');
   const c = new THREE.Color();
   for (let i = 0; i < n; i++) {
-    const r = 230 + Math.pow(rnd(), 1.5) * 1500;
+    const r = 460 + Math.pow(rnd(), 1.5) * 1700;
     const bras = ((i % 4) / 4) * Math.PI * 2;
     const angle = bras + r * 0.0034;
     const ecart = 30 + r * 0.13;
     pos[i * 3] = Math.cos(angle) * r + gauss() * ecart;
     pos[i * 3 + 1] = gauss() * (14 + r * 0.02);
     pos[i * 3 + 2] = Math.sin(angle) * r + gauss() * ecart;
-    c.copy(cCoeur).lerp(cBras, clamp((r - 230) / 1100, 0, 1));
+    c.copy(cCoeur).lerp(cBras, clamp((r - 460) / 1200, 0, 1));
     if (rnd() < 0.12) c.lerp(cRose, 0.7);
     c.multiplyScalar(0.55 + rnd() * 0.6);
     c.toArray(col, i * 3);
@@ -332,10 +335,10 @@ function textureSoleil() {
 }
 const soleilMat = new THREE.MeshBasicMaterial({ map: textureSoleil() });
 soleilMat.color.setScalar(2.4);
-const soleil = new THREE.Mesh(new THREE.SphereGeometry(7, 64, 64), soleilMat);
+const soleil = new THREE.Mesh(new THREE.SphereGeometry(9, 64, 64), soleilMat);
 scene.add(soleil);
 const halo = textureHalo(256);
-[[30, '#ffb347', 0.8], [60, '#ff7a18', 0.22]].forEach(([taille, teinte, opacite]) => {
+[[38, '#ffb347', 0.8], [76, '#ff7a18', 0.22]].forEach(([taille, teinte, opacite]) => {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
     map: halo, color: teinte, transparent: true, opacity: opacite, depthWrite: false, blending: THREE.AdditiveBlending,
   }));
@@ -403,7 +406,7 @@ function anneaux(rayon, p, rnd) {
   return m;
 }
 
-function ligneOrbite(R, couleur, libre) {
+function ligneOrbite(R, couleur, libre, opacite = 0.7) {
   const pts = [];
   for (let i = 0; i <= 256; i++) {
     const a = (i / 256) * Math.PI * 2;
@@ -412,7 +415,7 @@ function ligneOrbite(R, couleur, libre) {
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   const ligne = libre
     ? new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0x8899ff, dashSize: 1.4, gapSize: 2, transparent: true, opacity: 0.22 }))
-    : new THREE.Line(geo, new THREE.LineBasicMaterial({ color: couleur, transparent: true, opacity: 0.7 }));
+    : new THREE.Line(geo, new THREE.LineBasicMaterial({ color: couleur, transparent: true, opacity: opacite }));
   if (libre) ligne.computeLineDistances();
   scene.add(ligne);
 }
@@ -434,8 +437,9 @@ function zoneClic(parent, rayon, c) {
 function ajouterPlanete(p, index) {
   const seed = graine(`${p.nom}|${p.auteur}`);
   const rnd = aleatoire(seed);
-  const rayon = clamp(Number(p.taille) || 1, 0.6, 2.5);
-  const R = rayonOrbite(index);
+  // Les vraies planètes ont leur taille et leur orbite fixées dans systeme-solaire.js
+  const rayon = p.reelle ? p.taille : clamp(Number(p.taille) || 1, 0.6, 2.5);
+  const R = p.reelle ? p.R : rayonOrbite(index);
   const tex = texturePlanete(p, seed, haute ? 512 : 256);
 
   const holder = new THREE.Group();
@@ -477,15 +481,16 @@ function ajouterPlanete(p, index) {
     lunes.push({ mesh: lune, r: rayon * (2.8 + k * 0.9), v: 0.5 + rnd() * 0.7, a: rnd() * Math.PI * 2, inc: (rnd() - 0.5) * 0.7 });
   }
 
-  const etiq = etiquette(p.nom);
+  const etiq = etiquette(p.nom, p.reelle ? 'reelle' : '');
   etiq.position.set(0, rayon * 1.25 + 0.6, 0);
   holder.add(etiq);
   scene.add(holder);
-  ligneOrbite(R, hex(p.couleur || '#88aaff'), false);
+  ligneOrbite(R, hex(p.couleur || '#88aaff'), false, p.reelle ? 0.3 : 0.7);
 
   const c = {
     type: 'planete', data: p, index, holder, mesh, nuages, lunes, rayon, R,
-    angle: index * 2.399 + rnd() * 0.5, vitesse: 1.1 / Math.pow(R, 0.85), spin: 0.15 + rnd() * 0.25,
+    angle: p.reelle ? rnd() * Math.PI * 2 : index * 2.399 + rnd() * 0.5,
+    vitesse: 1.1 / Math.pow(R, 0.85), spin: 0.15 + rnd() * 0.25,
     etiquette: etiq.element,
   };
   c.angleDepart = c.angle;
@@ -515,13 +520,14 @@ function ajouterOrbiteLibre(index) {
   corps.push(c);
 }
 
+systemeSolaire.forEach((p) => ajouterPlanete(p, null));
 planetes.forEach(ajouterPlanete);
 for (let i = planetes.length; i < NB_ORBITES; i++) ajouterOrbiteLibre(i);
 
-const corpsSoleil = { type: 'soleil', holder: soleil, rayon: 7, lunes: [] };
-zoneClic(soleil, 8, corpsSoleil);
+const corpsSoleil = { type: 'soleil', holder: soleil, rayon: 9, lunes: [] };
+zoneClic(soleil, 10, corpsSoleil);
 
-// Ceinture d'astéroïdes, au-delà de la dernière orbite
+// Ceinture d'astéroïdes (décor)
 function ceinture() {
   const n = haute ? 2200 : 600;
   const m = new THREE.InstancedMesh(
@@ -530,9 +536,9 @@ function ceinture() {
     n,
   );
   const rnd = aleatoire(7), o = new THREE.Object3D();
-  const R0 = rayonOrbite(NB_ORBITES - 1) + 16;
+  const R0 = 56; // entre Mars et Jupiter, comme la vraie ceinture d'astéroïdes
   for (let i = 0; i < n; i++) {
-    const a = rnd() * Math.PI * 2, r = R0 + (rnd() + rnd() - 1) * 8;
+    const a = rnd() * Math.PI * 2, r = R0 + (rnd() + rnd() - 1) * 5;
     o.position.set(Math.cos(a) * r, (rnd() - 0.5) * 3, Math.sin(a) * r);
     o.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
     o.scale.setScalar(0.3 + Math.pow(rnd(), 3) * 2.2);
@@ -578,10 +584,26 @@ function creerHyperespace() {
 const hyperespace = creerHyperespace();
 
 // ---------- La course ----------
-const signature = graine(planetes.map((p) => `${p.nom}:${p.taille}:${p.type}`).join('|') + NB_ORBITES).toString(36);
+const signature = graine('v2|' + planetes.map((p) => `${p.nom}:${p.taille}:${p.type}`).join('|') + NB_ORBITES).toString(36);
 const course = creerCourse({
   scene, camera, corps, hyperespace, halo, haute, signature,
   quandQuitter: () => lancerExploration(),
+  quandChangerPerso: () => { course.arreter(); ouvrirSelection(); },
+});
+
+// ---------- Choix du personnage : un aperçu 3D qui tourne devant la caméra ----------
+let persoChoisi = lire('perso') || PERSONNAGES[0].id;
+if (!PERSONNAGES.some((p) => p.id === persoChoisi)) persoChoisi = PERSONNAGES[0].id;
+const vitrine = new THREE.Group();
+vitrine.position.set(0, 0.6, -7);
+vitrine.visible = false;
+camera.add(vitrine);
+const apercus = PERSONNAGES.map((p) => {
+  const a = creerPersonnage(p.id, halo);
+  a.racine.visible = false;
+  a.lueurs.forEach((l) => l.scale.setScalar(0.45));
+  vitrine.add(a.racine);
+  return a;
 });
 
 // ---------- Interface ----------
@@ -595,7 +617,7 @@ const nbLibres = NB_ORBITES - planetes.length;
 const nbAuteurs = new Set(planetes.map((p) => (p.auteur || '').trim().toLowerCase()).filter(Boolean)).size;
 const lienDepot = /^https?:\/\//.test(depot) ? depot : '#';
 
-$('compteur').textContent = `${planetes.length} planète${planetes.length > 1 ? 's' : ''} · ${nbLibres} orbites libres`;
+$('compteur').textContent = `${planetes.length} planète${planetes.length > 1 ? 's' : ''} de la classe · ${nbLibres} orbites libres`;
 btnQualite.textContent = haute ? 'Qualité : HD' : 'Qualité : éco';
 appliquerSon();
 
@@ -630,6 +652,21 @@ function contenuFiche(c) {
   }
   const p = c.data;
   const couleur = hex(p.couleur || '#88aaff');
+  if (p.reelle) {
+    const i = p.infos;
+    return `
+      <span class="badge" style="color:${couleur};border-color:${couleur}">Système solaire</span>
+      <h2>${p.nom}</h2>
+      <p class="auteur">Une vraie planète</p>
+      <p class="description">${p.description}</p>
+      <div class="stats">
+        <div><b>${i.diametre}</b><span>DIAMÈTRE</span></div>
+        <div><b>${i.distance}</b><span>DU SOLEIL</span></div>
+        <div><b>${i.annee}</b><span>UNE ANNÉE</span></div>
+      </div>
+      <p class="temperature">🌡️ Température : <b>${i.temperature}</b></p>
+      <div class="savais"><b>Le savais-tu ?</b> ${i.anecdote}</div>`;
+  }
   const lien = /^https?:\/\//.test(p.lien || '') ? p.lien : '';
   return `
     <span class="badge" style="color:${couleur};border-color:${couleur}">Planète ${echapper(p.type || 'rocheuse')}</span>
@@ -645,11 +682,15 @@ function contenuFiche(c) {
 }
 
 function remplirAnnuaire() {
-  const items = corps.filter((c) => c.type === 'planete').map((c) => `
+  const ligne = (c) => `
     <button data-i="${corps.indexOf(c)}">
       <span class="pastille" style="background:${hex(c.data.couleur || '#88aaff')};box-shadow:0 0 10px ${hex(c.data.couleur || '#88aaff')}"></span>
-      <span>${echapper(c.data.nom)}<small>par ${echapper(c.data.auteur || '?')}</small></span>
-    </button>`);
+      <span>${echapper(c.data.nom)}<small>${c.data.reelle ? c.data.infos.distance + ' du Soleil' : 'par ' + echapper(c.data.auteur || '?')}</small></span>
+    </button>`;
+  const items = [
+    '<p class="groupe">🪐 Planètes de la classe</p>',
+    ...corps.filter((c) => c.type === 'planete' && !c.data.reelle).map(ligne),
+  ];
   const libre = corps.findIndex((c) => c.type === 'libre');
   items.push(`
     <button data-i="soleil"><span class="pastille" style="background:#ffb347;box-shadow:0 0 10px #ffb347"></span>
@@ -659,6 +700,7 @@ function remplirAnnuaire() {
       <button data-i="${libre}"><span class="pastille" style="border:1px dashed #9fb0ff"></span>
         <span>${nbLibres} orbites libres<small>ajoute ta planète</small></span></button>`);
   }
+  items.push('<p class="groupe">☀️ Système solaire</p>', ...corps.filter((c) => c.type === 'planete' && c.data.reelle).map(ligne));
   annuaire.innerHTML = items.join('');
   annuaire.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     annuaire.classList.add('cache');
@@ -772,43 +814,88 @@ canvas.addEventListener('pointermove', (e) => {
   canvas.style.cursor = c ? 'pointer' : '';
 });
 
-// ---------- Passer de la course à l'exploration ----------
-let modeChoisi = 'course';
+// ---------- Accueil → choix du personnage → course, ou accueil → exploration ----------
+const selection = $('selection');
 
 function entrer(mode) {
   if (etat !== 'accueil') return;
-  modeChoisi = mode;
-  etat = 'intro';
-  debutIntro = horloge.elapsedTime;
-  departIntro.copy(camera.position);
   intro.classList.add('cache');
   setTimeout(() => { intro.style.display = 'none'; }, 1300);
   son.demarrerSon();
+  if (mode === 'course') { ouvrirSelection(); return; }
+  etat = 'intro';
+  debutIntro = horloge.elapsedTime;
+  departIntro.copy(camera.position);
   son.bruitage('hyperespace');
   hyperespace.lignes.visible = true;
 }
 
-function lancerCourse() {
+function afficherPerso() {
+  const i = PERSONNAGES.findIndex((p) => p.id === persoChoisi);
+  apercus.forEach((a, k) => { a.racine.visible = k === i; });
+  $('perso-nom').textContent = PERSONNAGES[i].nom;
+  $('perso-desc').textContent = PERSONNAGES[i].description;
+  $('perso-points').innerHTML = PERSONNAGES.map((_, k) => `<i class="${k === i ? 'actif' : ''}"></i>`).join('');
+}
+
+function changerPerso(sens) {
+  const n = PERSONNAGES.length;
+  const i = PERSONNAGES.findIndex((p) => p.id === persoChoisi);
+  persoChoisi = PERSONNAGES[(i + sens + n) % n].id;
+  ecrire('perso', persoChoisi);
+  afficherPerso();
+}
+
+function ouvrirSelection() {
+  fermerFicheEtSuivi();
+  etat = 'selection';
+  document.body.classList.remove('en-course');
+  hud.classList.add('cache');
+  aide.classList.add('cache');
+  rendusEtiquettes.domElement.style.opacity = '0';
+  camera.clearViewOffset();
+  camera.fov = 55;
+  camera.updateProjectionMatrix();
+  lumiereCamera.intensity = 1;
+  vitrine.visible = true;
+  afficherPerso();
+  selection.classList.remove('cache');
+}
+
+function fermerFicheEtSuivi() {
   fiche.classList.add('cache');
   annuaire.classList.add('cache');
   suivi?.etiquette?.classList.remove('cache');
   suivi = null;
   enVol = retour = false;
   decalage.x = decalage.y = 0;
+}
+
+function lancerCourse() {
+  selection.classList.add('cache');
+  vitrine.visible = false;
+  hud.classList.remove('cache');
+  rendusEtiquettes.domElement.style.opacity = '1';
   controls.enabled = false;
   etat = 'course';
   document.body.classList.add('en-course');
   btnMode.textContent = '🔭 Explorer';
   lumiereCamera.intensity = 0.8;
-  course.demarrer();
+  course.demarrer(persoChoisi);
 }
 
 function lancerExploration() {
   course.arreter();
+  selection.classList.add('cache');
+  vitrine.visible = false;
+  hud.classList.remove('cache');
+  aide.classList.remove('cache');
+  rendusEtiquettes.domElement.style.opacity = '1';
   etat = 'libre';
   document.body.classList.remove('en-course');
   btnMode.textContent = '🏁 Course';
   lumiereCamera.intensity = 0;
+  controls.target.copy(ORIGINE);
   controls.minDistance = 10;
   retour = true;
   debutVol = horloge.elapsedTime;
@@ -816,10 +903,14 @@ function lancerExploration() {
 
 btnCourse.addEventListener('click', () => entrer('course'));
 btnExplorer.addEventListener('click', () => entrer('explorer'));
+$('perso-prec').addEventListener('click', () => changerPerso(-1));
+$('perso-suiv').addEventListener('click', () => changerPerso(1));
+$('perso-go').addEventListener('click', () => lancerCourse());
+$('perso-explorer').addEventListener('click', () => lancerExploration());
 btnMode.addEventListener('click', () => {
   btnMode.blur();
   if (etat === 'course') lancerExploration();
-  else if (etat === 'libre') lancerCourse();
+  else if (etat === 'libre') ouvrirSelection();
 });
 $('fiche-fermer').addEventListener('click', fermer);
 $('btn-annuaire').addEventListener('click', () => annuaire.classList.toggle('cache'));
@@ -838,7 +929,12 @@ btnQualite.addEventListener('click', () => {
 });
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && etat === 'libre') { annuaire.classList.add('cache'); fermer(); }
-  if (e.key === 'Enter' && etat === 'accueil') entrer('course');
+  if (e.key === 'Enter' && etat === 'accueil') { entrer('course'); return; }
+  if (etat === 'selection') {
+    if (e.key === 'ArrowLeft') changerPerso(-1);
+    if (e.key === 'ArrowRight') changerPerso(1);
+    if (e.key === 'Enter') { e.preventDefault(); lancerCourse(); }
+  }
 });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -873,10 +969,15 @@ function boucle() {
     }
   }
 
-  if (etat === 'accueil') {
+  if (etat === 'accueil' || etat === 'selection') {
     const a = t * 0.03;
     camera.position.set(Math.sin(a) * 2000, 500, Math.cos(a) * 2000);
     camera.lookAt(ORIGINE);
+    if (etat === 'selection') {
+      vitrine.rotation.y += dt * 0.8;
+      vitrine.rotation.x = 0.25 + Math.sin(t * 0.8) * 0.08;
+      apercus.forEach((a2) => a2.racine.visible && a2.animer(t));
+    }
   } else if (etat === 'intro') {
     const p = Math.min((t - debutIntro) / DUREE_INTRO, 1);
     const e = 1 - Math.pow(1 - p, 4);
@@ -896,7 +997,6 @@ function boucle() {
       hud.classList.remove('cache');
       aide.classList.remove('cache');
       rendusEtiquettes.domElement.style.opacity = '1';
-      if (modeChoisi === 'course') lancerCourse();
     }
   } else if (etat === 'course') {
     course.maj(dt);
@@ -913,3 +1013,6 @@ function boucle() {
 boucle();
 btnCourse.disabled = btnExplorer.disabled = false;
 btnCourse.textContent = '🏁 Lancer la course';
+
+// Mode démo : avec ?auto dans l'adresse, la course démarre seule et le vaisseau se pilote tout seul
+if (new URLSearchParams(location.search).has('auto')) { entrer('course'); lancerCourse(); }

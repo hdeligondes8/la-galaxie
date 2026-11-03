@@ -62,11 +62,27 @@
 
   <p id="aide" class="cache">Glisse pour tourner · Molette ou pincer pour zoomer · Clique sur une planète</p>
 
+  <!-- Choix du personnage -->
+  <section id="selection" class="cache">
+    <p class="sur-titre">CHOISIS TON PILOTE</p>
+    <div class="selecteur">
+      <button id="perso-prec" aria-label="Personnage précédent">◀</button>
+      <div class="perso-texte">
+        <h2 id="perso-nom"></h2>
+        <p id="perso-desc"></p>
+      </div>
+      <button id="perso-suiv" aria-label="Personnage suivant">▶</button>
+    </div>
+    <div id="perso-points"></div>
+    <button id="perso-go" class="gros">C'est parti ! ▸</button>
+    <button id="perso-explorer" class="lien-discret">ou explorer la galaxie</button>
+  </section>
+
   <!-- Course -->
   <div id="hud-course">
     <div class="chrono">
       <b id="c-temps">0:00.00</b>
-      <div class="infos"><span id="c-tour"></span><span id="c-portail"></span><span id="c-record"></span></div>
+      <div class="infos"><span id="c-portail"></span><span id="c-prochain"></span><span id="c-record"></span></div>
     </div>
     <div class="bas">
       <span id="c-vitesse"></span>
@@ -91,6 +107,7 @@
       <p id="r-objectifs"></p>
       <div class="actions">
         <button id="r-rejouer" class="primaire">↻ Rejouer</button>
+        <button id="r-perso">🎭 Personnage</button>
         <button id="r-partager">Partager mon temps</button>
         <button id="r-explorer">🔭 Explorer</button>
       </div>
