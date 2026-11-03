@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>La Galaxie</title>
+  <meta name="description" content="Une galaxie en 3D construite à plusieurs : chaque planète a été ajoutée par quelqu'un. Ajoute la tienne.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Écran d'accueil -->
+  <section id="intro">
+    <div class="intro-contenu">
+      <p class="sur-titre">PROJET OPEN SOURCE · CONSTRUIT À PLUSIEURS</p>
+      <h1 class="titre">LA GALAXIE</h1>
+      <p class="sous-titre">Chaque planète a été ajoutée par quelqu'un.<br>Il reste des orbites libres.</p>
+      <button id="btn-entrer" disabled>Chargement…</button>
+      <p class="astuce">🎧 Avec le son, c'est mieux</p>
+    </div>
+  </section>
+
+  <!-- Interface -->
+  <header id="hud" class="cache">
+    <div class="logo">
+      <span class="logo-point"></span>
+      <div>
+        <strong>LA GALAXIE</strong>
+        <small id="compteur"></small>
+      </div>
+    </div>
+    <nav class="boutons">
+      <button id="btn-annuaire" title="Liste des planètes">☰ Planètes</button>
+      <button id="btn-son" title="Son">🔇</button>
+      <button id="btn-qualite" title="Qualité graphique"></button>
+      <button id="btn-ajouter" class="primaire">+ Ajoute ta planète</button>
+    </nav>
+  </header>
+
+  <aside id="annuaire" class="cache"></aside>
+
+  <aside id="fiche" class="cache">
+    <button id="fiche-fermer" aria-label="Fermer">✕</button>
+    <div id="fiche-contenu"></div>
+  </aside>
+
+  <p id="aide" class="cache">Glisse pour tourner · Molette ou pincer pour zoomer · Clique sur une planète</p>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
