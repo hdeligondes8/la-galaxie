@@ -5,6 +5,7 @@ Le circuit traverse les 8 vraies planètes du système solaire, puis les planèt
 chaque personne qui contribue au projet. Chaque nouvelle planète = un nouveau portail.
 
 👉 **Jouer : https://la-galaxie.vercel.app**
+(le site se met à jour tout seul dès qu'une modification est acceptée sur ce projet)
 
 Le projet est **open source** : tout le monde peut voir le code, le copier et l'améliorer.
 
