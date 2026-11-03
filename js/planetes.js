@@ -29,6 +29,32 @@ export const planetes = [
     lunes: 2,
     lien: "",
   },
+  {
+    nom: "ECOTRA",
+    auteur: "Hugo",
+    description:
+      "La planète de la logistique. Ici, chaque colis trouve sa route, et les anneaux sont des autoroutes de livraison qui ne dorment jamais.",
+    type: "gazeuse",
+    couleur: "#10b981",
+    couleur2: "#0e3b5c",
+    taille: 2.1,
+    anneaux: true,
+    lunes: 3,
+    lien: "",
+  },
+  {
+    nom: "Pulse Care",
+    auteur: "Hugo",
+    description:
+      "Une planète de glace, fraîche et éclatante, avec des veines couleur bambou. Ici, tout brille, surtout les sourires.",
+    type: "glace",
+    couleur: "#ff7f6e",
+    couleur2: "#7a9a3a",
+    taille: 1.3,
+    anneaux: false,
+    lunes: 1,
+    lien: "",
+  },
 
   // ---------- MODÈLE (copie-moi !) ----------
   // {
